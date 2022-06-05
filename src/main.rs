@@ -1,60 +1,93 @@
 use std::fs;
 use std::path::PathBuf;
 
+// FIXME: debug only
+use dotenv;
+
 use clap::Parser;
-use anyhow::Result;
+use anyhow::{Result, Context};
 
 mod cli;
+mod state;
 
-enum PathMode {
-    Add(PathBuf),
-    Rm(PathBuf),
-}
+fn main() -> Result<()> {
+    dotenv::dotenv().ok();
 
-// TODO: Add ability to write to file
-//       Weigh benefits of human-readable vs. binary format
-//       My money is on human-readable, though, AKA serde_json, probably
-// TODO: Expand dirstack at run-time to enumerate all the directories/files
-// TODO: Find a way to remove operations that negate one another,
-//       e.g. +DIR_A +DIR_B -DIR_A = +DIR_B
-struct State {
-    dirstack: Vec<PathMode>,
-}
-
-// TODO: Make sure to read in the state at some point!
-fn main() {
     let cli = cli::Cli::parse();
 
     let store_path = cli.get_store_path()
-        .expect("Unable to retrieve store path");
+        .context("Unable to retrieve store path")?;
     init_dir(&store_path)
-        .expect("Unable to initialize store path");
+        .context("Unable to initialize store path")?;
 
     let data_path = cli.get_data_path()
-        .expect("Unable to retrieve data path");
+        .context("Unable to retrieve data path")?;
     init_dir(&data_path)
-        .expect("Unable to initialize data path");
+        .context("Unable to initialize data path")?;
 
-    // TODO: At least for more complicated commands (i.e. select),
+    // Load the state from disk
+    let mut state = state::State::load(&data_path)?;
+
+    // NOTE: Should there be an init command to explicitly initialize
+    //       directories and state file?
+    // TODO: At least for more complicated commands (e.g. select),
     //       make the command into its own struct, instead of just
     //       and enum struct. Might need methods for them anyhow.
+    // TODO: Make either `select` or `ls` command default
+    // TODO: Only add path rules to dirstack if the path exists?
+    // TODO: Allow regex or other pattern matching to the dirstack?
     if let Some(cmd) = cli.command {
         match cmd {
-            cli::Cmd::Add { files, all } => {
-                println!("ADD: {:?}", files);
+            cli::Cmd::Add { paths, all } => {
+                // Add each path to the state (if any)
+                for path in paths { state.add(path); }
+
+                // Add all paths to the state if requested
+                if all {
+                    state.clear();
+                    state.add(PathBuf::from("."));
+                }
+
+                // Save the state to disk
+                state.save().context("Unable to save state")?;
             },
-            cli::Cmd::Rm { files, all } => {
-                println!("RM:  {:?}", files);
+
+            cli::Cmd::Rm { paths, all } => {
+                // Remove each path from the state (if any)
+                for path in paths { state.rm(path); }
+
+                // Clear the state if requested
+                if all { state.clear(); }
+
+                // Save the state to disk
+                state.save().context("Unable to save state")?;
             },
-            
-            // FIXME: Here just for testing, Cmd enum should be matched
-            //        exaustively
-            _ => {},
+
+            cli::Cmd::Ls => { ls(&state); },
+
+            cli::Cmd::Select => {
+                // TODO: Select a random file using the rules in the dirstack
+            },
         }
-    }
+    } else { ls(&state); }
+
+    Ok(())
 }
 
 fn init_dir(path: &PathBuf) -> Result<()> {
     if ! path.exists() { fs::create_dir_all(path)?; }
     Ok(())
+}
+
+fn ls(state: &state::State) {
+    for item in &state.dirstack {
+        match item {
+            state::PathMode::Add(path) => {
+                println!("+{}", path.display());
+            },
+            state::PathMode::Rm(path) => {
+                println!("-{}", path.display());
+            },
+        }
+    }
 }
