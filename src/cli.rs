@@ -7,7 +7,7 @@ use clap::{Parser, Subcommand};
 // #[clap(name = "deco")]
 #[clap(author, version, about)]
 #[clap(long_about = None)]
-#[clap(help_heading = "GLOBAL OPTIONS")]
+#[clap(next_help_heading = "GLOBAL OPTIONS")]
 pub struct Cli {
     #[clap(long, parse(from_os_str), value_name = "PATH", global = true)]
     #[clap(env = "DECO_STORE_PATH", hide_env_values = true)]
@@ -44,6 +44,7 @@ pub enum Cmd {
         files: Vec<PathBuf>,
 
         #[clap(long, short = 'A')]
+        #[clap(help = "Add all backgrounds to the pool")]
         #[clap(conflicts_with = "files")]
         all: bool,
     },
@@ -52,6 +53,7 @@ pub enum Cmd {
         files: Vec<PathBuf>,
 
         #[clap(long, short = 'A')]
+        #[clap(help = "Remove all backgrounds from the pool")]
         #[clap(conflicts_with = "files")]
         all: bool,
     },
