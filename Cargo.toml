@@ -1,0 +1,13 @@
+[package]
+name = "deco"
+version = "0.1.0"
+authors = ["J. Brock <joseph.brock@protonmail.com>"]
+description = "Wallpaper management and selection"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+clap = { version = "3.1.18", features = ["env", "derive"] }
+dirs = "4.0.0"
+dotenv = "0.15.0"
